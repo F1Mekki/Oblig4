@@ -1,13 +1,29 @@
-# Import necessary modules
-from flask import Flask, render_template, request, redirect, url_for, jsonify
-
 from project import app
+from flask import render_template, request, redirect, url_for, jsonify
 from project.models.User import findUserByUsername
 
-app = Flask(__name__)
+
+# route index
+@app.route('/', methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        username = request.form["username"]
+        try:
+            user = findUserByUsername(username)
+            data = {
+                "username": user.username,
+                "email": user.email
+            }
+        except Exception as err:
+            print(f"Error: {err}")
+    else:
+        data = {
+            "username": "Not specified",
+            "email": "Not specified"
+        }
+    return render_template('index.html.j2', data=data)
 
 
-# routes
 # Define CRUD Endpoints for 'Cars,' 'Customer,' and 'Employee'
 
 # Create, Read, Update and Delete ‘Cars' with basic information
@@ -153,26 +169,5 @@ def return_car():
     # If the customer has rented the car, change the car's status from 'rented' to 'available' or 'damaged'
     # based on the car's condition.
 
-    return jsonify({"message": f"Car {car_id} has been returned by customer {customer_id} in {car_condition} condition."})
-
-
-
-@app.route('/', methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        username = request.form["username"]
-        try:
-            user = findUserByUsername(username)
-            data = {
-                "username": user.username,
-                "email": user.email
-            }
-        except err:
-            print(err)
-
-    else:
-        data = {
-            "username": "Not specified",
-            "email": "Not specified"
-        }
-    return render_template('index.html.j2', data=data)
+    return jsonify(
+        {"message": f"Car {car_id} has been returned by customer {customer_id} in {car_condition} condition."})
