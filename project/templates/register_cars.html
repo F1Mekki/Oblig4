@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Car Registration</title>
+</head>
+<body>
+    <h1>Car Registration</h1>
+    <form action="/api/cars" method="POST">
+        <label for="make">Make:</label>
+        <input type="text" name="make" required><br><br>
+
+        <label for="model">Model:</label>
+        <input type="text" name="model" required><br><br>
+
+        <label for="year">Year:</label>
+        <input type="text" name="year" required><br><br>
+
+        <label for="location">Location:</label>
+        <input type="text" name="location" required><br><br>
+
+        <label for="status">Status:</label>
+        <select name="status" required>
+            <option value="available">Available</option>
+            <option value="booked">Booked</option>
+            <option value="rented">Rented</option>
+            <option value="damaged">Damaged</option>
+        </select><br><br>
+
+        <input type="submit" value="Register Car">
+    </form>
+</body>
+</html>

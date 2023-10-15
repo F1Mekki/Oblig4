@@ -1,6 +1,7 @@
 from project import app
+from neo4j import GraphDatabase
 from flask import render_template, request, redirect, url_for, jsonify
-from project.models.User import findUserByUsername
+from project.models.User import findUserByUsername, _get_connection
 
 
 # route index
@@ -15,7 +16,8 @@ def index():
                 "email": user.email
             }
         except Exception as err:
-            print(f"Error: {err}")
+            return jsonify({"error": str(err)}), 500
+
     else:
         data = {
             "username": "Not specified",
@@ -26,13 +28,42 @@ def index():
 
 # Define CRUD Endpoints for 'Cars,' 'Customer,' and 'Employee'
 
+
 # Create, Read, Update and Delete ‘Cars' with basic information
 # e.g., make, model, year, location, status (i.e., available, booked, rented, damaged):
+
+# Route to display the car registration form
+@app.route('/register-car', methods=['GET'])
+def display_car_registration_form():
+    return render_template('register_cars.html')
+
+
 @app.route("/api/cars", methods=["POST"])
 def create_car():
-    # Implement the logic to create a new car and save it to the database.
-    # Use request.json to get data from the request.
+    make = request.form.get('make')
+    model = request.form.get('model')
+    year = request.form.get('year')
+    location = request.form.get('location')
+    status = request.form.get('status')
+
+    # Get a Neo4j database driver instance using your _get_connection() function
+    driver = _get_connection()
+
+    # Create a new car node in the Neo4j database
+    with driver.session() as session:
+        result = session.write_transaction(create_car_node, make, model, year, location, status)
+        print("Result: ", result)
+
+    driver.close()
     return jsonify({"message": "Car created successfully."})
+
+
+# Transaction function to create a car node in the Neo4j database
+def create_car_node(tx, make, model, year, location, status):
+    query = (
+        "CREATE (c:Car {make: $make, model: $model, year: $year, location: $location, status: $status})"
+    )
+    tx.run(query, make=make, model=model, year=year, location=location, status=status)
 
 
 # Read information about a car:

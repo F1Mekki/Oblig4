@@ -5,11 +5,23 @@ URI = "neo4j+s://1a80dac1.databases.neo4j.io"
 AUTH = ("neo4j", "56EKaLKqJ0yU6In0TC_u1gUkmi237dgthBG9XCCbXtA")
 
 
-def _get_connection() -> Driver:
-    driver = GraphDatabase.driver(URI, auth=AUTH)
-    driver.verify_connectivity()
+# test
+def _get_connection() -> Driver | None:
+    try:
+        driver = GraphDatabase.driver(URI, auth=AUTH)
+        driver.verify_connectivity()
+        return driver
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
-    return driver
+
+# test
+driver = _get_connection()
+if driver:
+    print("It worked")
+else:
+    print("Failed to connect to the database.")
 
 
 def findUserByUsername(username):
