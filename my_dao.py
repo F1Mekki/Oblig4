@@ -48,6 +48,5 @@ def delete_car(reg):
     _get_connection().execute_query("MATCH (a:Car{reg: $reg}) delete a;", reg = reg)
 
 
-# mir lova lova
 
 findAllCars()
