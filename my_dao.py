@@ -6,9 +6,11 @@ def _get_connection() -> Driver:
     driver = GraphDatabase.driver(URI, auth=AUTH)
     driver.verify_connectivity()
     return driver
+
 def node_to_json(node):
     node_properties = dict(node.items())
     return node_properties
+
 def findAllCars():
     with _get_connection().session() as session:
         cars = session.run("MATCH (a:Car) RETURN a;")
@@ -45,5 +47,7 @@ def update_car(make, model, reg, year, capacity):
 def delete_car(reg):
     _get_connection().execute_query("MATCH (a:Car{reg: $reg}) delete a;", reg = reg)
 
+
+# mir lova lova
 
 findAllCars()
