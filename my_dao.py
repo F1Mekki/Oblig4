@@ -2,6 +2,8 @@ from neo4j import GraphDatabase, Driver, AsyncGraphDatabase, AsyncDriver
 import json
 URI = "neo4j+s://1a80dac1.databases.neo4j.io"
 AUTH = ("neo4j", "hc/rH7QXs6fa")
+#?
+
 def _get_connection() -> Driver:
     driver = GraphDatabase.driver(URI, auth=AUTH)
     driver.verify_connectivity()
@@ -48,4 +50,10 @@ def delete_car(reg):
     _get_connection().execute_query("MATCH (a:Car{reg: $reg}) delete a;", reg = reg)
 
 
+<<<<<<< HEAD
+=======
+# mir lova lova
+## zaggi wer r u
+
+>>>>>>> cdc043aad30c2155c12fcaf5ac690a4dc9896138
 findAllCars()
