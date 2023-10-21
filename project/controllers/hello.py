@@ -1,7 +1,6 @@
 from project import app
-from neo4j import GraphDatabase
-from flask import render_template, request, redirect, url_for, jsonify
-from project.models.User import findUserByUsername, _get_connection
+from flask import render_template, request, redirect, url_for, jsonify, json
+from project.models.User import findUserByUsername, save_car, findAllCars, update_car, delete_car
 
 
 # route index
@@ -16,7 +15,7 @@ def index():
                 "email": user.email
             }
         except Exception as err:
-            return jsonify({"error": str(err)}), 500
+            print("Error2: ", err)
 
     else:
         data = {
@@ -33,62 +32,81 @@ def index():
 # e.g., make, model, year, location, status (i.e., available, booked, rented, damaged):
 
 # Route to display the car registration form
-@app.route('/register-car', methods=['GET'])
+# Create Cars
+@app.route('/register_car', methods=['GET'])
 def display_car_registration_form():
     return render_template('register_cars.html')
 
 
-@app.route("/api/cars", methods=["POST"])
+@app.route("/save_car", methods=["POST"])
 def create_car():
-    make = request.form.get('make')
-    model = request.form.get('model')
-    year = request.form.get('year')
-    location = request.form.get('location')
-    status = request.form.get('status')
+    reg = request.form['reg']
+    make = request.form['make']
+    model = request.form['model']
+    year = request.form['year']
+    location = request.form['location']
+    status = request.form['status']
 
-    # Get a Neo4j database driver instance using your _get_connection() function
-    driver = _get_connection()
-
-    # Create a new car node in the Neo4j database
-    with driver.session() as session:
-        result = session.write_transaction(create_car_node, make, model, year, location, status)
-        print("Result: ", result)
-
-    driver.close()
-    return jsonify({"message": "Car created successfully."})
+    return save_car(reg, make, model, year, location, status)
 
 
-# Transaction function to create a car node in the Neo4j database
-def create_car_node(tx, make, model, year, location, status):
-    query = (
-        "CREATE (c:Car {make: $make, model: $model, year: $year, location: $location, status: $status})"
-    )
-    tx.run(query, make=make, model=model, year=year, location=location, status=status)
+# Read Cars information (listing all cars)
+@app.route('/get_cars', methods=['GET'])
+def query_records():
+    cars = findAllCars()
+    return cars
 
 
-# Read information about a car:
-@app.route('/api/cars/<car_id>', methods=['GET'])
-def get_car(car_id):
-    # Implement the logic to retrieve information about the specified car.
-    return jsonify({"message": f"Information about car {car_id}."})
+# Update Cars information
+# Test data format in json in postman body JSON
+"""
+{
+  "reg": "1",
+  "make": "Tesla",
+  "model": "Model S",
+  "year": "2024",
+  "location": "Oslo",
+  "status": "booked"
+}
+"""
 
 
-# Update information about a car:
-@app.route('/api/cars/<car_id>', methods=['PUT'])
-def update_car(car_id):
-    # Implement the logic to update information about the specified car.
-    return jsonify({"message": f"Car {car_id} updated successfully."})
+@app.route('/update_car', methods=['PUT'])
+def update_car_info():
+    data = request.json
+    required_fields = ["reg", "make", "model", "year", "location", "status"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_car = update_car(
+            data["reg"],
+            data['make'],
+            data['model'],
+            data['year'],
+            data['location'],
+            data['status']
+        )
+        return jsonify(updated_car), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Delete a car:
-@app.route('/api/cars/<car_id>', methods=['DELETE'])
-def delete_car(car_id):
-    # Implement the logic to delete the specified car from the database.
-    return jsonify({"message": f"Car {car_id} deleted successfully."})
+@app.route('/delete_car', methods=['DELETE'])
+def delete_car_info():
+    record = json.loads(request.data)  # convert json to python
+    print(record)
+    delete_car(record['reg'])
+    return findAllCars()
 
+#############
 
-# next
-# Create, Read, Update and Delete ‘Customer’ with basic information e.g., name, age, address.
+# Next: Create, Read, Update and Delete ‘Customer’ with basic information e.g., name, age, address.
+
 # Create a new customer:
 @app.route("/api/customers", methods=["POST"])
 def create_customer():
