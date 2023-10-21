@@ -212,10 +212,15 @@ def delete_employee_info():
 
 # ################# Second half
 
-# Implement an endpoint ‘order-car’ where a customer-id, car-id is passed as parameters.
-@app.route('/api/order-car', methods=['POST'])
+# Implement an endpoint ‘order-car’ where:
+# a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has not booked other cars.
+# The system changes the status of the car with car-id from ‘available’ to ‘booked’.
+
+@app.route('/order_car', methods=['POST'])
 def order_car():
     data = request.json
+    print(data)
     customer_id = data.get('customer-id')
     car_id = data.get('car-id')
 
@@ -225,8 +230,11 @@ def order_car():
     return jsonify({"message": f"Car {car_id} is now booked by customer {customer_id}."})
 
 
-# Implement 'cancel-order-car' Endpoint
-@app.route('/cancel-order-car', methods=['POST'])
+# Implement 'cancel-order-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has booked for the car.
+# If the customer has booked the car, the car becomes available.
+@app.route('/cancel_order_car', methods=['POST'])
 def cancel_order_car():
     data = request.json
     customer_id = data.get('customer-id')
@@ -238,8 +246,12 @@ def cancel_order_car():
     return jsonify({"message": f"Booking for car {car_id} is canceled by customer {customer_id}."})
 
 
-# Implement 'rent-car' Endpoint
-@app.route('/rent-car', methods=['POST'])
+# Implement 'rent-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has a booking for the car.
+# The car’s status is changed from ‘booked’ to ‘rented’.
+
+@app.route('/rent_car', methods=['POST'])
 def rent_car():
     data = request.json
     customer_id = data.get('customer-id')
@@ -251,8 +263,12 @@ def rent_car():
     return jsonify({"message": f"Car {car_id} is now rented by customer {customer_id}."})
 
 
-# Implement 'return-car' Endpoint
-@app.route('/return-car', methods=['POST'])
+# Implement 'return-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# Car’s status (e.g., ok or damaged) during the return will also be sent as a parameter.
+# The system must check that the customer with customer-id has rented the car.
+# The car’s status is changed from ‘booked’ to ‘available’ or ‘damaged’
+@app.route('/return_car', methods=['POST'])
 def return_car():
     data = request.json
     customer_id = data.get('customer-id')
@@ -265,3 +281,5 @@ def return_car():
 
     return jsonify(
         {"message": f"Car {car_id} has been returned by customer {customer_id} in {car_condition} condition."})
+
+# End
