@@ -1,5 +1,4 @@
-from neo4j import GraphDatabase, Driver, AsyncGraphDatabase, AsyncDriver
-import re
+from neo4j import GraphDatabase
 
 # Read the environment variables from the .env file
 NEO4J_URI = 'neo4j+s://356e2ccc.databases.neo4j.io'
@@ -80,7 +79,7 @@ def findAllCars():
 def update_car(reg, make, model, year, location, status):
     with _get_connection().session() as session:
         # Check if the car with the given reg exists
-        car_exists = session.run("MATCH (a:Car{reg:$reg}) RETURN a", reg=reg).single()
+        car_exists = session.run("MATCH (a:Car{reg:$reg}) RETURN a;", reg=reg).single()
 
         if not car_exists:
             raise ValueError(f"No car found with reg: {reg}")
@@ -107,4 +106,55 @@ def update_car(reg, make, model, year, location, status):
 def delete_car(reg):
     _get_connection().execute_query("MATCH (a:Car {reg:$reg}) DELETE a;", reg=reg)
 
-######################
+
+# Customer
+# Create Customer
+def save_customer(personnummer, name, age, address):
+    customers = _get_connection().execute_query(
+        "MERGE (c:Customer{personnummer: $personnummer, name: $name, age: $age, address: $address}) RETURN c;",
+        personnummer=personnummer, name=name, age=age, address=address, )
+    print(customers)
+    node_json = [node_to_json(record["c"]) for record in customers.records]
+    print(node_json)
+    return node_json
+
+
+# Read Customer
+
+def findAllCustomers():
+    with _get_connection().session() as session:
+        customers = session.run("MATCH (c:Customer) RETURN c;")
+        node_json = [node_to_json(record["c"]) for record in customers]
+        print(node_json)
+        return node_json
+
+
+# Update Customer
+
+def update_customer(personnummer, name, age, address):
+    with _get_connection().session() as session:
+        # Check if the car with the given personnummer exists
+        customer_exists = session.run("MATCH (c:Customer {personnummer:$personnummer}) RETURN c",
+                                      personnummer=personnummer).single()
+        if not customer_exists:
+            raise ValueError(f"No customer found with personnummer: {personnummer}")
+
+        # customer exists; update
+        customers = session.run(
+            """      
+                MATCH (c:Customer {personnummer:$personnummer})
+                SET c.personnummer=$personnummer,
+                    c.name=$name,
+                    c.age=$age,
+                    c.address=$address
+                RETURN c
+                """,
+            personnummer=personnummer, name=name, age=age, address=address
+        )
+        nodes_json = [node_to_json(record["c"]) for record in customers]
+        return nodes_json
+
+
+def delete_customer(personnummer):
+    _get_connection().execute_query("MATCH (c:Customer {personnummer:$personnummer}) DELETE c",
+                                    personnummer=personnummer)

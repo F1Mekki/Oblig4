@@ -1,6 +1,7 @@
 from project import app
-from flask import render_template, request, redirect, url_for, jsonify, json
+from flask import render_template, request, jsonify, json
 from project.models.User import findUserByUsername, save_car, findAllCars, update_car, delete_car
+from project.models.User import save_customer, findAllCustomers, update_customer, delete_customer
 
 
 # route index
@@ -103,41 +104,61 @@ def delete_car_info():
     delete_car(record['reg'])
     return findAllCars()
 
-#############
 
-# Next: Create, Read, Update and Delete ‘Customer’ with basic information e.g., name, age, address.
+#  ############ Customers ######
+
+# Next: Create, Read, Update and Delete ‘Customer’ with basic information
+# personnummer, name, age, address.
 
 # Create a new customer:
-@app.route("/api/customers", methods=["POST"])
-def create_customer():
-    # Implement the logic to create a new customer and save it to the database.
-    # Use request.json to get data from the request.
-    return jsonify({"message": "Customer created successfully."})
+@app.route("/register_customer", methods=["POST"])
+def register_customer():
+    record = json.loads(request.data)
+    print("Customer to be Registered: ", record)
+    return save_customer(record["personnummer"], record["name"], record["age"], record["address"])
 
 
-# Read information about a customer:
-@app.route('/api/customers/<customer_id>', methods=['GET'])
-def get_customer(customer_id):
-    # Implement the logic to retrieve information about the specified customer.
-    return jsonify({"message": f"Information about customer {customer_id}."})
+# Read Customer information:
+@app.route('/get_customers', methods=['GET'])
+def get_customers():
+    customers = findAllCustomers()
+    return customers
 
 
 # Update information about a customer:
-@app.route('/api/customers/<customer_id>', methods=['PUT'])
-def update_customer(customer_id):
-    # Implement the logic to update information about the specified customer.
-    return jsonify({"message": f"Customer {customer_id} updated successfully."})
+@app.route('/update_customer', methods=['PUT'])
+def update_customer_info():
+    data = request.json
+    required_fields = ["personnummer", "name", "age", "address"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_customer = update_customer(
+            data["personnummer"],
+            data['name'],
+            data['age'],
+            data['address'])
+
+        return jsonify(updated_customer), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Delete a customer:
-@app.route('/api/customers/<customer_id>', methods=['DELETE'])
-def delete_customer(customer_id):
-    # Implement the logic to delete the specified customer from the database.
-    return jsonify({"message": f"Customer {customer_id} deleted successfully."})
+@app.route('/delete_customer', methods=['DELETE'])
+def delete_customer_info():
+    record = json.loads(request.data)  # convert json data format to python format
+    print("Customer To Be Deleted: ", record)
+    delete_customer(record["personnummer"])
+    return findAllCustomers()
 
 
-# next Employee
-# Create, Read, Update and Delete ‘Employee’ with basic information e.g., name, address, branch
+# Employee
+# Create, Read, Update and Delete ‘Employee’ with basic information (personnummer, name, address, branch
 # Create a new Employee:
 @app.route("/api/employees", methods=["POST"])
 def create_employee():
