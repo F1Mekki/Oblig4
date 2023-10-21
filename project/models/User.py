@@ -74,8 +74,6 @@ def findAllCars():
 
 
 # update car by reg
-
-
 def update_car(reg, make, model, year, location, status):
     with _get_connection().session() as session:
         # Check if the car with the given reg exists
@@ -133,7 +131,7 @@ def findAllCustomers():
 
 def update_customer(personnummer, name, age, address):
     with _get_connection().session() as session:
-        # Check if the car with the given personnummer exists
+        # Check if the customer with the given personnummer exists
         customer_exists = session.run("MATCH (c:Customer {personnummer:$personnummer}) RETURN c",
                                       personnummer=personnummer).single()
         if not customer_exists:
@@ -158,3 +156,56 @@ def update_customer(personnummer, name, age, address):
 def delete_customer(personnummer):
     _get_connection().execute_query("MATCH (c:Customer {personnummer:$personnummer}) DELETE c",
                                     personnummer=personnummer)
+
+
+# employee
+# Create Employee
+def save_employee(personnummer, name, age, address, branch):
+    employees = _get_connection().execute_query(
+        "MERGE (c:Employee {personnummer: $personnummer, name: $name, age: $age, address: $address, branch: $branch "
+        "}) RETURN c;",
+        personnummer=personnummer, name=name, age=age, address=address, branch=branch)
+    print(employees)
+    node_json = [node_to_json(record["c"]) for record in employees.records]
+    print(node_json)
+    return node_json
+
+
+# Read Employees
+def findAllEmployees():
+    with _get_connection().session() as session:
+        employees = session.run("MATCH (a:Employee) RETURN a")
+        node_json = [node_to_json(record["a"]) for record in employees]
+        print(node_json)
+        return node_json
+
+
+# Update Employee
+
+def update_employee(personnummer, name, age, address, branch):
+    with _get_connection().session() as session:
+        # Check if the employee with the given personnummer exists
+        employee_exists = session.run("MATCH (c:Employee {personnummer:$personnummer}) RETURN c",
+                                      personnummer=personnummer).single()
+        if not employee_exists:
+            raise ValueError(f"No Employee found with personnummer: {personnummer}")
+
+        # Employee exists; update
+        employee = session.run(
+            """                                                                                                          
+                MATCH (c:Employee {personnummer:$personnummer})                                                          
+                SET c.personnummer=$personnummer,                                                                        
+                    c.name=$name,                                                                                        
+                    c.age=$age,                                                                                          
+                    c.address=$address, 
+                    c.branch=$branch                                                                                 
+                RETURN c                                                                                                 
+                """,
+            personnummer=personnummer, name=name, age=age, address=address, branch=branch
+        )
+        nodes_json = [node_to_json(record["c"]) for record in employee]
+        return nodes_json
+
+
+def delete_employee(personnummer):
+    _get_connection().execute_query("MATCH (c:Employee {personnummer:$personnummer}) DELETE c", personnummer=personnummer)

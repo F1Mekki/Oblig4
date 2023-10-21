@@ -2,6 +2,7 @@ from project import app
 from flask import render_template, request, jsonify, json
 from project.models.User import findUserByUsername, save_car, findAllCars, update_car, delete_car
 from project.models.User import save_customer, findAllCustomers, update_customer, delete_customer
+from project.models.User import save_employee, findAllEmployees, update_employee, delete_employee
 
 
 # route index
@@ -158,35 +159,58 @@ def delete_customer_info():
 
 
 # Employee
-# Create, Read, Update and Delete ‘Employee’ with basic information (personnummer, name, address, branch
+# Create, Read, Update and Delete ‘Employee’ with basic information
+# (personnummer, name, address, branch ("Bergen, Oslo, Stavanger") )
+
 # Create a new Employee:
-@app.route("/api/employees", methods=["POST"])
-def create_employee():
-    # Implement the logic to create a new employee and save it to the database.
-    # Use request.json to get data from the request.
-    return jsonify({"message": "Employee created successfully."})
+@app.route("/register_employee", methods=["POST"])
+def register_employee():
+    record = json.loads(request.data)
+    print("Employee to be Registered: ", record)
+    return save_employee(record["personnummer"], record["name"], record["age"], record["address"], record["branch"])
 
 
-# Read information about an employee:
-@app.route('/api/employees/<employee_id>', methods=['GET'])
-def get_employee(employee_id):
-    # Implement the logic to retrieve information about the specified employee.
-    return jsonify({"message": f"Information about employee {employee_id}."})
+# Read Employee information:
+@app.route('/get_employee', methods=['GET'])
+def get_employees():
+    employees = findAllEmployees()
+    return employees
 
 
-# Update information about an employee:
-@app.route('/api/employees/<employee_id>', methods=['PUT'])
-def update_employee(employee_id):
-    # Implement the logic to update information about the specified employee.
-    return jsonify({"message": f"Employee {employee_id} updated successfully."})
+# Update information about an Employee:
+@app.route('/update_employee', methods=['PUT'])
+def update_employee_info():
+    data = request.json
+    required_fields = ["personnummer", "name", "age", "address", "branch"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_employee = update_employee(
+            data["personnummer"],
+            data['name'],
+            data['age'],
+            data['address'],
+            data["branch"])
+
+        return jsonify(updated_employee), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# Delete an employee:
-@app.route('/api/employees/<employee_id>', methods=['DELETE'])
-def delete_employee(employee_id):
-    # Implement the logic to delete the specified employee from the database.
-    return jsonify({"message": f"Employee {employee_id} deleted successfully."})
+# Delete an Employee:
+@app.route('/delete_employee', methods=['DELETE'])
+def delete_employee_info():
+    record = json.loads(request.data)  # convert json data format to python format
+    print("Employee To Be Deleted: ", record)
+    delete_employee(record["personnummer"])
+    return findAllCustomers()
 
+
+# ################# Second half
 
 # Implement an endpoint ‘order-car’ where a customer-id, car-id is passed as parameters.
 @app.route('/api/order-car', methods=['POST'])
@@ -202,7 +226,7 @@ def order_car():
 
 
 # Implement 'cancel-order-car' Endpoint
-@app.route('/api/cancel-order-car', methods=['POST'])
+@app.route('/cancel-order-car', methods=['POST'])
 def cancel_order_car():
     data = request.json
     customer_id = data.get('customer-id')
@@ -215,7 +239,7 @@ def cancel_order_car():
 
 
 # Implement 'rent-car' Endpoint
-@app.route('/api/rent-car', methods=['POST'])
+@app.route('/rent-car', methods=['POST'])
 def rent_car():
     data = request.json
     customer_id = data.get('customer-id')
@@ -228,7 +252,7 @@ def rent_car():
 
 
 # Implement 'return-car' Endpoint
-@app.route('/api/return-car', methods=['POST'])
+@app.route('/return-car', methods=['POST'])
 def return_car():
     data = request.json
     customer_id = data.get('customer-id')
