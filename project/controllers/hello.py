@@ -3,6 +3,7 @@ from flask import render_template, request, jsonify, json
 from project.models.User import findUserByUsername, save_car, findAllCars, update_car, delete_car
 from project.models.User import save_customer, findAllCustomers, update_customer, delete_customer
 from project.models.User import save_employee, findAllEmployees, update_employee, delete_employee
+from project.models.User import customer_order_car, customer_cancel_car, customer_rent_car, car_condition
 
 
 # route index
@@ -116,7 +117,7 @@ def delete_car_info():
 def register_customer():
     record = json.loads(request.data)
     print("Customer to be Registered: ", record)
-    return save_customer(record["personnummer"], record["name"], record["age"], record["address"])
+    return save_customer(record["personnummer"], record["name"], record["age"], record["address"], record["carBooked"])
 
 
 # Read Customer information:
@@ -130,7 +131,7 @@ def get_customers():
 @app.route('/update_customer', methods=['PUT'])
 def update_customer_info():
     data = request.json
-    required_fields = ["personnummer", "name", "age", "address"]
+    required_fields = ["personnummer", "name", "age", "address", "carBooked"]
 
     if not all(field in data for field in required_fields):
         return jsonify({"error": "Missing required fields"}), 400
@@ -140,7 +141,8 @@ def update_customer_info():
             data["personnummer"],
             data['name'],
             data['age'],
-            data['address'])
+            data['address'],
+            data['carBooked'])
 
         return jsonify(updated_customer), 200
     except ValueError as ve:
@@ -217,33 +219,35 @@ def delete_employee_info():
 # The system must check that the customer with customer-id has not booked other cars.
 # The system changes the status of the car with car-id from ‘available’ to ‘booked’.
 
-@app.route('/order_car', methods=['POST'])
+@app.route('/order_car', methods=['PUT'])
 def order_car():
-    data = request.json
-    print(data)
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    record = json.loads(request.data)
+    car_id = record["reg"]  # car_id of the node Car is "reg" in neo4j DB
+    customer_id = record["personnummer"]  # customer id of the node Customer is personnummer in neo4j DB
 
-    # Implement the logic to check if the customer has not booked other cars.
-    # Change the status of the car with car_id from 'available' to 'booked' if the customer is eligible.
+    success, message = customer_order_car(customer_id, car_id)
 
-    return jsonify({"message": f"Car {car_id} is now booked by customer {customer_id}."})
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
 
 # Implement 'cancel-order-car' Endpoint where:
 # where a customer-id, car-id is passed as parameters.
 # The system must check that the customer with customer-id has booked for the car.
 # If the customer has booked the car, the car becomes available.
-@app.route('/cancel_order_car', methods=['POST'])
+@app.route('/cancel_order_car', methods=['PUT'])
 def cancel_order_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    data = json.loads(request.data)
+    customer_id = data.get('personnummer')  # or data["personnummer"]
+    car_id = data.get('reg')  # or data["reg"]
+    success, message = customer_cancel_car(customer_id, car_id)
 
-    # Implement the logic to check if the customer has booked the specified car.
-    # If the customer has booked the car, change the car's status from 'booked' to 'available.'
-
-    return jsonify({"message": f"Booking for car {car_id} is canceled by customer {customer_id}."})
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
 
 # Implement 'rent-car' Endpoint where:
@@ -251,16 +255,17 @@ def cancel_order_car():
 # The system must check that the customer with customer-id has a booking for the car.
 # The car’s status is changed from ‘booked’ to ‘rented’.
 
-@app.route('/rent_car', methods=['POST'])
+@app.route('/rent_car', methods=['PUT'])
 def rent_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    data = request.json  # or data = json.loads(request.data)
+    customer_id = data.get('personnummer')
+    car_id = data.get('reg')
 
-    # Implement the logic to check if the customer has a booking for the specified car.
-    # If the customer has a booking, change the car's status from 'booked' to 'rented.'
-
-    return jsonify({"message": f"Car {car_id} is now rented by customer {customer_id}."})
+    success, message = customer_rent_car(customer_id, car_id)
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
 
 # Implement 'return-car' Endpoint where:
@@ -268,18 +273,17 @@ def rent_car():
 # Car’s status (e.g., ok or damaged) during the return will also be sent as a parameter.
 # The system must check that the customer with customer-id has rented the car.
 # The car’s status is changed from ‘booked’ to ‘available’ or ‘damaged’
-@app.route('/return_car', methods=['POST'])
+@app.route('/return_car', methods=['PUT'])
 def return_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
-    car_condition = data.get('car-condition')  # Expected values: 'ok' or 'damaged'
+    data = request.json  # or data = json.loads(request.data)
+    customer_id = data.get('personnummer')
+    car_id = data.get('reg')
 
-    # Implement the logic to check if the customer has rented the specified car.
-    # If the customer has rented the car, change the car's status from 'rented' to 'available' or 'damaged'
-    # based on the car's condition.
+    success, message = car_condition(customer_id, car_id)
 
-    return jsonify(
-        {"message": f"Car {car_id} has been returned by customer {customer_id} in {car_condition} condition."})
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
 # End

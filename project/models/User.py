@@ -107,10 +107,10 @@ def delete_car(reg):
 
 # Customer
 # Create Customer
-def save_customer(personnummer, name, age, address):
+def save_customer(personnummer, name, age, address, carBooked):
     customers = _get_connection().execute_query(
-        "MERGE (c:Customer{personnummer: $personnummer, name: $name, age: $age, address: $address}) RETURN c;",
-        personnummer=personnummer, name=name, age=age, address=address, )
+        "MERGE (c:Customer{personnummer: $personnummer, name: $name, age: $age, address: $address, carBooked: $carBooked}) RETURN c;",
+        personnummer=personnummer, name=name, age=age, address=address, carBooked=carBooked)
     print(customers)
     node_json = [node_to_json(record["c"]) for record in customers.records]
     print(node_json)
@@ -129,7 +129,7 @@ def findAllCustomers():
 
 # Update Customer
 
-def update_customer(personnummer, name, age, address):
+def update_customer(personnummer, name, age, address, carBooked):
     with _get_connection().session() as session:
         # Check if the customer with the given personnummer exists
         customer_exists = session.run("MATCH (c:Customer {personnummer:$personnummer}) RETURN c",
@@ -144,10 +144,11 @@ def update_customer(personnummer, name, age, address):
                 SET c.personnummer=$personnummer,
                     c.name=$name,
                     c.age=$age,
-                    c.address=$address
+                    c.address=$address,
+                    c.carBooked=$carBooked,
                 RETURN c
                 """,
-            personnummer=personnummer, name=name, age=age, address=address
+            personnummer=personnummer, name=name, age=age, address=address, carBooked=carBooked
         )
         nodes_json = [node_to_json(record["c"]) for record in customers]
         return nodes_json
@@ -208,4 +209,154 @@ def update_employee(personnummer, name, age, address, branch):
 
 
 def delete_employee(personnummer):
-    _get_connection().execute_query("MATCH (c:Employee {personnummer:$personnummer}) DELETE c", personnummer=personnummer)
+    _get_connection().execute_query("MATCH (c:Employee {personnummer:$personnummer}) DELETE c",
+                                    personnummer=personnummer)
+
+
+# ################# Second half
+
+# Implement an endpoint ‘order-car’ where:
+# a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has not booked other cars.
+# The system changes the status of the car with car-id from ‘available’ to ‘booked’.
+
+# Order car
+def customer_order_car(customer_id, car_id):
+    with _get_connection().session() as session:
+        # Retrieve Customer's carBooked property using personnummer
+        customer_result = session.run(
+            "MATCH (c:Customer {personnummer:$personnummer}) RETURN c.carBooked As carBooked;",
+            personnummer=customer_id)
+        customer_record = customer_result.single()
+
+        carBooked = customer_record["carBooked"]
+        # If the customer has already booked a car, return an error
+        if carBooked:
+            return False, "Customer has already booked a car."
+
+        # Check if the car is available
+        car_result = session.run(
+            "MATCH (a:Car {reg: $reg}) RETURN a.status As status;",
+            reg=car_id)
+        car_record = car_result.single()  # retrieve single record if it exists
+        #  print("Here car_record: ", car_record["status"])
+        status = car_record["status"]
+
+        # If the car is available, book it for the customer
+        if status == "available":
+            session.run(
+                "MATCH (a:Car {reg: $reg}) SET a.status = 'booked' RETURN a;",
+                reg=car_id
+            )
+            session.run(
+                "MATCH (c:Customer {personnummer: $personnummer}) SET c.carBooked = $reg RETURN c;",
+                personnummer=customer_id, reg=car_id
+            )
+            return True, f"Car {car_id} is now booked by customer {customer_id}."
+
+        else:
+            return False, f"Car {car_id} is not available."
+
+
+# Cancel order car
+def customer_cancel_car(customer_id, car_id):
+    with _get_connection().session() as session:
+        # Retrieve Customer's carBooked property using personnummer
+        customer_result = session.run(
+            "MATCH (c:Customer {personnummer:$personnummer}) RETURN c.carBooked As carBooked;",
+            personnummer=customer_id)
+        customer_record = customer_result.single()  # returns False if customer have not booked any cars.
+        carBooked = customer_record["carBooked"]
+
+        car_result = session.run(
+            "MATCH (a:Car {reg: $reg}) RETURN a.reg As reg;",
+            reg=car_id)
+        car_record = car_result.single()  # retrieve single record if it exists
+        car_reg = car_record["reg"]
+
+        if not carBooked:
+            return True, f"Customer: Customer ID {customer_id} has no car booked."
+        elif carBooked == car_reg:
+            session.run(
+                "MATCH (a:Car {reg: $reg}) SET a.status = 'available' RETURN a;",
+                reg=car_id
+            )
+            session.run(
+                "MATCH (c:Customer {personnummer: $personnummer}) SET c.carBooked = $false RETURN c;",
+                personnummer=customer_id, false=False
+            )
+            return True, (f"The customer: Customer ID: {customer_id} canceled his order and The Car: Car ID: {car_id} "
+                          f"is now available.")
+
+        else:
+            return False, f"Customer: {customer_id} has another booked car: Register number {car_reg}."
+
+
+#  Rent car
+def customer_rent_car(customer_id, car_id):
+    with _get_connection().session() as session:
+        # Retrieve Customer's carBooked property using personnummer
+        customer_result = session.run(
+            "MATCH (c:Customer {personnummer:$personnummer}) RETURN c.carBooked As carBooked;",
+            personnummer=customer_id)
+        customer_record = customer_result.single()  # returns False if customer have not booked any cars.
+        carBooked = customer_record["carBooked"]
+
+        # Retrieve Car's reg property using car_id
+        car_result = session.run(
+            "MATCH (a:Car {reg: $reg}) RETURN a.reg As reg;",
+            reg=car_id)
+        car_record = car_result.single()  # retrieve single record if it exists
+        car_reg = car_record["reg"]
+
+        if not carBooked:  # if the customer have not booked any car at all
+            return True, f"Customer: Customer ID {customer_id} has no car booked."
+        elif carBooked == car_reg:
+            session.run(
+                "MATCH (a:Car {reg: $reg}) SET a.status = 'rented' RETURN a;",
+                reg=car_id
+            )
+            return True, f"The customer: Customer ID: {customer_id} rented his car order: Car ID: {car_id} "
+
+        else:
+            return False, f"Customer: {customer_id} has another booked car: Register number {car_reg}."
+
+
+# Return car
+# the customer was a troublemaker and damaged the rented car ;)
+
+def car_condition(customer_id, car_id):
+    with _get_connection().session() as session:
+        # Retrieve Customer's carBooked property using personnummer
+        customer_result = session.run(
+            "MATCH (c:Customer {personnummer:$personnummer}) RETURN c.carBooked As carBooked;",
+            personnummer=customer_id)
+        customer_record = customer_result.single()  # returns False if customer have not booked any cars.
+        carBooked = customer_record["carBooked"]
+
+        # Retrieve Car's reg property using car_id
+        car_result = session.run(
+            "MATCH (a:Car {reg: $reg}) RETURN a.reg As reg;",
+            reg=car_id)
+        car_record = car_result.single()  # retrieve single record if it exists
+        car_reg = car_record["reg"]
+
+        if not carBooked:  # if the customer have not booked/rented any car at all # false
+            return True, f"Customer: Customer ID {customer_id} has no car rent."
+
+        elif carBooked == car_reg:
+            session.run(
+                "MATCH (a:Car {reg: $reg}) SET a.status = 'damaged' RETURN a;",
+                reg=car_id
+            )
+            session.run(     # removing the booked/rented car from customer carBooked property to false
+                "MATCH (c:Customer {personnummer: $personnummer}) SET c.carBooked = $false RETURN c;",
+                personnummer=customer_id, false=False
+            )
+
+            return True, f"The customer ID: {customer_id} returned car ID: {car_id}. Status: Damaged. "
+
+        else:
+            return False, f"Customer: {customer_id} has another booked car: Register number {car_reg}."
+
+# End
