@@ -1,7 +1,9 @@
 from project import app
-from neo4j import GraphDatabase
-from flask import render_template, request, redirect, url_for, jsonify
-from project.models.User import findUserByUsername, _get_connection
+from flask import render_template, request, jsonify, json
+from project.models.User import findUserByUsername, save_car, findAllCars, update_car, delete_car
+from project.models.User import save_customer, findAllCustomers, update_customer, delete_customer
+from project.models.User import save_employee, findAllEmployees, update_employee, delete_employee
+from project.models.User import customer_order_car, customer_cancel_car, customer_rent_car, car_condition
 
 
 # route index
@@ -16,7 +18,7 @@ def index():
                 "email": user.email
             }
         except Exception as err:
-            return jsonify({"error": str(err)}), 500
+            print("Error2: ", err)
 
     else:
         data = {
@@ -33,172 +35,255 @@ def index():
 # e.g., make, model, year, location, status (i.e., available, booked, rented, damaged):
 
 # Route to display the car registration form
-@app.route('/register-car', methods=['GET'])
+# Create Cars
+@app.route('/register_car', methods=['GET'])
 def display_car_registration_form():
     return render_template('register_cars.html')
 
 
-@app.route("/api/cars", methods=["POST"])
+@app.route("/save_car", methods=["POST"])
 def create_car():
-    make = request.form.get('make')
-    model = request.form.get('model')
-    year = request.form.get('year')
-    location = request.form.get('location')
-    status = request.form.get('status')
+    reg = request.form['reg']
+    make = request.form['make']
+    model = request.form['model']
+    year = request.form['year']
+    location = request.form['location']
+    status = request.form['status']
 
-    # Get a Neo4j database driver instance using your _get_connection() function
-    driver = _get_connection()
-
-    # Create a new car node in the Neo4j database
-    with driver.session() as session:
-        result = session.write_transaction(create_car_node, make, model, year, location, status)
-        print("Result: ", result)
-
-    driver.close()
-    return jsonify({"message": "Car created successfully."})
+    return save_car(reg, make, model, year, location, status)
 
 
-# Transaction function to create a car node in the Neo4j database
-def create_car_node(tx, make, model, year, location, status):
-    query = (
-        "CREATE (c:Car {make: $make, model: $model, year: $year, location: $location, status: $status})"
-    )
-    tx.run(query, make=make, model=model, year=year, location=location, status=status)
+# Read Cars information (listing all cars)
+@app.route('/get_cars', methods=['GET'])
+def query_records():
+    cars = findAllCars()
+    return cars
 
 
-# Read information about a car:
-@app.route('/api/cars/<car_id>', methods=['GET'])
-def get_car(car_id):
-    # Implement the logic to retrieve information about the specified car.
-    return jsonify({"message": f"Information about car {car_id}."})
+# Update Cars information
+# Test data format in json in postman body JSON
+"""
+{
+  "reg": "1",
+  "make": "Tesla",
+  "model": "Model S",
+  "year": "2024",
+  "location": "Oslo",
+  "status": "booked"
+}
+"""
 
 
-# Update information about a car:
-@app.route('/api/cars/<car_id>', methods=['PUT'])
-def update_car(car_id):
-    # Implement the logic to update information about the specified car.
-    return jsonify({"message": f"Car {car_id} updated successfully."})
+@app.route('/update_car', methods=['PUT'])
+def update_car_info():
+    data = request.json
+    required_fields = ["reg", "make", "model", "year", "location", "status"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_car = update_car(
+            data["reg"],
+            data['make'],
+            data['model'],
+            data['year'],
+            data['location'],
+            data['status']
+        )
+        return jsonify(updated_car), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Delete a car:
-@app.route('/api/cars/<car_id>', methods=['DELETE'])
-def delete_car(car_id):
-    # Implement the logic to delete the specified car from the database.
-    return jsonify({"message": f"Car {car_id} deleted successfully."})
+@app.route('/delete_car', methods=['DELETE'])
+def delete_car_info():
+    record = json.loads(request.data)  # convert json to python
+    print(record)
+    delete_car(record['reg'])
+    return findAllCars()
 
 
-# next
-# Create, Read, Update and Delete ‘Customer’ with basic information e.g., name, age, address.
+#  ############ Customers ######
+
+# Next: Create, Read, Update and Delete ‘Customer’ with basic information
+# personnummer, name, age, address.
+
 # Create a new customer:
-@app.route("/api/customers", methods=["POST"])
-def create_customer():
-    # Implement the logic to create a new customer and save it to the database.
-    # Use request.json to get data from the request.
-    return jsonify({"message": "Customer created successfully."})
+@app.route("/register_customer", methods=["POST"])
+def register_customer():
+    record = json.loads(request.data)
+    print("Customer to be Registered: ", record)
+    return save_customer(record["personnummer"], record["name"], record["age"], record["address"], record["carBooked"])
 
 
-# Read information about a customer:
-@app.route('/api/customers/<customer_id>', methods=['GET'])
-def get_customer(customer_id):
-    # Implement the logic to retrieve information about the specified customer.
-    return jsonify({"message": f"Information about customer {customer_id}."})
+# Read Customer information:
+@app.route('/get_customers', methods=['GET'])
+def get_customers():
+    customers = findAllCustomers()
+    return customers
 
 
 # Update information about a customer:
-@app.route('/api/customers/<customer_id>', methods=['PUT'])
-def update_customer(customer_id):
-    # Implement the logic to update information about the specified customer.
-    return jsonify({"message": f"Customer {customer_id} updated successfully."})
+@app.route('/update_customer', methods=['PUT'])
+def update_customer_info():
+    data = request.json
+    required_fields = ["personnummer", "name", "age", "address", "carBooked"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_customer = update_customer(
+            data["personnummer"],
+            data['name'],
+            data['age'],
+            data['address'],
+            data['carBooked'])
+
+        return jsonify(updated_customer), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Delete a customer:
-@app.route('/api/customers/<customer_id>', methods=['DELETE'])
-def delete_customer(customer_id):
-    # Implement the logic to delete the specified customer from the database.
-    return jsonify({"message": f"Customer {customer_id} deleted successfully."})
+@app.route('/delete_customer', methods=['DELETE'])
+def delete_customer_info():
+    record = json.loads(request.data)  # convert json data format to python format
+    print("Customer To Be Deleted: ", record)
+    delete_customer(record["personnummer"])
+    return findAllCustomers()
 
 
-# next Employee
-# Create, Read, Update and Delete ‘Employee’ with basic information e.g., name, address, branch
+# Employee
+# Create, Read, Update and Delete ‘Employee’ with basic information
+# (personnummer, name, address, branch ("Bergen, Oslo, Stavanger") )
+
 # Create a new Employee:
-@app.route("/api/employees", methods=["POST"])
-def create_employee():
-    # Implement the logic to create a new employee and save it to the database.
-    # Use request.json to get data from the request.
-    return jsonify({"message": "Employee created successfully."})
+@app.route("/register_employee", methods=["POST"])
+def register_employee():
+    record = json.loads(request.data)
+    print("Employee to be Registered: ", record)
+    return save_employee(record["personnummer"], record["name"], record["age"], record["address"], record["branch"])
 
 
-# Read information about an employee:
-@app.route('/api/employees/<employee_id>', methods=['GET'])
-def get_employee(employee_id):
-    # Implement the logic to retrieve information about the specified employee.
-    return jsonify({"message": f"Information about employee {employee_id}."})
+# Read Employee information:
+@app.route('/get_employee', methods=['GET'])
+def get_employees():
+    employees = findAllEmployees()
+    return employees
 
 
-# Update information about an employee:
-@app.route('/api/employees/<employee_id>', methods=['PUT'])
-def update_employee(employee_id):
-    # Implement the logic to update information about the specified employee.
-    return jsonify({"message": f"Employee {employee_id} updated successfully."})
+# Update information about an Employee:
+@app.route('/update_employee', methods=['PUT'])
+def update_employee_info():
+    data = request.json
+    required_fields = ["personnummer", "name", "age", "address", "branch"]
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        updated_employee = update_employee(
+            data["personnummer"],
+            data['name'],
+            data['age'],
+            data['address'],
+            data["branch"])
+
+        return jsonify(updated_employee), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404  # Not Found error for missing car
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# Delete an employee:
-@app.route('/api/employees/<employee_id>', methods=['DELETE'])
-def delete_employee(employee_id):
-    # Implement the logic to delete the specified employee from the database.
-    return jsonify({"message": f"Employee {employee_id} deleted successfully."})
+# Delete an Employee:
+@app.route('/delete_employee', methods=['DELETE'])
+def delete_employee_info():
+    record = json.loads(request.data)  # convert json data format to python format
+    print("Employee To Be Deleted: ", record)
+    delete_employee(record["personnummer"])
+    return findAllCustomers()
 
 
-# Implement an endpoint ‘order-car’ where a customer-id, car-id is passed as parameters.
-@app.route('/api/order-car', methods=['POST'])
+# ################# Second half
+
+# Implement an endpoint ‘order-car’ where:
+# a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has not booked other cars.
+# The system changes the status of the car with car-id from ‘available’ to ‘booked’.
+
+@app.route('/order_car', methods=['PUT'])
 def order_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    record = json.loads(request.data)
+    car_id = record["reg"]  # car_id of the node Car is "reg" in neo4j DB
+    customer_id = record["personnummer"]  # customer id of the node Customer is personnummer in neo4j DB
 
-    # Implement the logic to check if the customer has not booked other cars.
-    # Change the status of the car with car_id from 'available' to 'booked' if the customer is eligible.
+    success, message = customer_order_car(customer_id, car_id)
 
-    return jsonify({"message": f"Car {car_id} is now booked by customer {customer_id}."})
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
 
-# Implement 'cancel-order-car' Endpoint
-@app.route('/api/cancel-order-car', methods=['POST'])
+# Implement 'cancel-order-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has booked for the car.
+# If the customer has booked the car, the car becomes available.
+@app.route('/cancel_order_car', methods=['PUT'])
 def cancel_order_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    data = json.loads(request.data)
+    customer_id = data.get('personnummer')  # or data["personnummer"]
+    car_id = data.get('reg')  # or data["reg"]
+    success, message = customer_cancel_car(customer_id, car_id)
 
-    # Implement the logic to check if the customer has booked the specified car.
-    # If the customer has booked the car, change the car's status from 'booked' to 'available.'
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
-    return jsonify({"message": f"Booking for car {car_id} is canceled by customer {customer_id}."})
 
+# Implement 'rent-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# The system must check that the customer with customer-id has a booking for the car.
+# The car’s status is changed from ‘booked’ to ‘rented’.
 
-# Implement 'rent-car' Endpoint
-@app.route('/api/rent-car', methods=['POST'])
+@app.route('/rent_car', methods=['PUT'])
 def rent_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
+    data = request.json  # or data = json.loads(request.data)
+    customer_id = data.get('personnummer')
+    car_id = data.get('reg')
 
-    # Implement the logic to check if the customer has a booking for the specified car.
-    # If the customer has a booking, change the car's status from 'booked' to 'rented.'
+    success, message = customer_rent_car(customer_id, car_id)
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
 
-    return jsonify({"message": f"Car {car_id} is now rented by customer {customer_id}."})
 
-
-# Implement 'return-car' Endpoint
-@app.route('/api/return-car', methods=['POST'])
+# Implement 'return-car' Endpoint where:
+# where a customer-id, car-id is passed as parameters.
+# Car’s status (e.g., ok or damaged) during the return will also be sent as a parameter.
+# The system must check that the customer with customer-id has rented the car.
+# The car’s status is changed from ‘booked’ to ‘available’ or ‘damaged’
+@app.route('/return_car', methods=['PUT'])
 def return_car():
-    data = request.json
-    customer_id = data.get('customer-id')
-    car_id = data.get('car-id')
-    car_condition = data.get('car-condition')  # Expected values: 'ok' or 'damaged'
+    data = request.json  # or data = json.loads(request.data)
+    customer_id = data.get('personnummer')
+    car_id = data.get('reg')
 
-    # Implement the logic to check if the customer has rented the specified car.
-    # If the customer has rented the car, change the car's status from 'rented' to 'available' or 'damaged'
-    # based on the car's condition.
+    success, message = car_condition(customer_id, car_id)
 
-    return jsonify(
-        {"message": f"Car {car_id} has been returned by customer {customer_id} in {car_condition} condition."})
+    if success:
+        return jsonify({"message": message})
+    else:
+        return jsonify(message, status=400)  # 400 Bad Request
+
+# End
